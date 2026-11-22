@@ -1,0 +1,117 @@
+% configure 3d solar system simulation parameters
+sim.name = "Solar System";
+sim.duration = 120;
+sim.gravity = 9.81;
+sim.width = 1280;
+sim.height = 720;
+sim.star_count = 320;
+sim.camera_position = [0, 0, -1080];
+sim.camera_pitch = 0.22;
+
+% instantiate central golden-amber star
+primary_star = star();
+primary_star.mass = 1.989e30;
+primary_star.radius = 68;
+primary_star.position = [640, 360, 0];
+primary_star.color = [255, 196, 62];
+primary_star.secondary_color = [232, 108, 34];
+primary_star.corona_count = 120;
+primary_star.turbulence = 0.007;
+primary_star.luminosity = 1.25;
+
+% configure inner rocky coral planet and orbit
+inner_orbit = orbit();
+inner_orbit.center = primary_star.position;
+inner_orbit.radius = 155;
+inner_orbit.inclination = 0.08;
+inner_orbit.speed = 0.015;
+inner_orbit.color = [110, 145, 200];
+inner_orbit.show_trail = true;
+
+rocky_planet = planet();
+rocky_planet.mass = 3.3e23;
+rocky_planet.radius = 15;
+rocky_planet.color = [228, 96, 78];
+rocky_planet.secondary_color = [175, 72, 58];
+rocky_planet.particle_count = 200;
+rocky_planet.spin_speed = 0.018;
+rocky_planet.orbit = inner_orbit;
+
+% configure oceanic teal planet with polar caps and orbiting moon
+ocean_orbit = orbit();
+ocean_orbit.center = primary_star.position;
+ocean_orbit.radius = 270;
+ocean_orbit.inclination = -0.06;
+ocean_orbit.speed = 0.009;
+ocean_orbit.color = [75, 125, 195];
+ocean_orbit.show_trail = true;
+
+ocean_planet = planet();
+ocean_planet.mass = 5.972e24;
+ocean_planet.radius = 26;
+ocean_planet.color = [38, 212, 224];
+ocean_planet.secondary_color = [30, 122, 198];
+ocean_planet.polar_caps = true;
+ocean_planet.particle_count = 320;
+ocean_planet.spin_speed = 0.014;
+ocean_planet.orbit = ocean_orbit;
+
+moon_orbit = orbit();
+moon_orbit.center = ocean_planet.position;
+moon_orbit.radius = 52;
+moon_orbit.inclination = 0.25;
+moon_orbit.speed = 0.032;
+moon_orbit.show_trail = false;
+
+ocean_moon = satellite();
+ocean_moon.radius = 7;
+ocean_moon.color = [205, 216, 232];
+ocean_moon.particle_count = 65;
+ocean_moon.parent = ocean_planet;
+ocean_moon.orbit = moon_orbit;
+
+% configure 3d toroidal asteroid belt with arithmetic and 0-based indexing
+belt = particle_group();
+belt.mode = "belt";
+belt.center = [640, 360, 0];
+belt.center[2] = 0;
+belt.inner_radius = 355;
+belt.outer_radius = 405;
+belt.thickness = 28;
+belt.count = 360;
+belt.mass = 0.5;
+belt.total_mass = belt.count * belt.mass;
+belt.angular_speed = 0.0025;
+belt.color = [195, 205, 220];
+
+% configure outer ringed sandstone gas giant with division gap
+giant_orbit = orbit();
+giant_orbit.center = primary_star.position;
+giant_orbit.radius = 510;
+giant_orbit.inclination = 0.11;
+giant_orbit.speed = 0.0045;
+giant_orbit.color = [95, 130, 185];
+giant_orbit.show_trail = true;
+
+gas_giant = planet();
+gas_giant.mass = 5.683e26;
+gas_giant.radius = 38;
+gas_giant.color = [220, 188, 142];
+gas_giant.secondary_color = [184, 140, 96];
+gas_giant.particle_count = 420;
+gas_giant.spin_speed = 0.011;
+gas_giant.orbit = giant_orbit;
+
+giant_rings = rings();
+giant_rings.inner_radius = 56;
+giant_rings.outer_radius = 98;
+giant_rings.gap_inner = 76;
+giant_rings.gap_outer = 81;
+giant_rings.tilt = [0.42, 0.18, -0.08];
+giant_rings.color = [218, 190, 148];
+giant_rings.secondary_color = [165, 138, 108];
+giant_rings.particle_count = 520;
+gas_giant.rings = giant_rings;
+
+% launch simulation
+simulate(sim.duration);

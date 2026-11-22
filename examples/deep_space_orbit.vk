@@ -1,0 +1,100 @@
+% configure volumetric deep-space orbital vista
+sim.name = "Deep Space Orbit";
+sim.duration = 120;
+sim.width = 1280;
+sim.height = 720;
+sim.star_count = 340;
+sim.camera_position = [0, 0, -1080];
+sim.camera_pitch = 0.24;
+
+% configure volumetric 3d violet and magenta cosmic nebula with 0-based region shift
+nebula = particle_group();
+nebula.mode = "nebula";
+nebula.count = 480;
+nebula.mass = 0.4;
+nebula.total_mass = nebula.count * nebula.mass;
+nebula.color = [168, 92, 245];
+nebula.secondary_color = [224, 84, 178];
+nebula.angular_speed = 0.0014;
+nebula.spread = random(0.95, 1.25);
+nebula.position = random([180, 120, 160], [1100, 600, 560]);
+nebula.position[0] = nebula.position[0] + 20;
+
+% instantiate off-center radiant primary star
+primary_star = star();
+primary_star.mass = 2.4e30;
+primary_star.radius = 66;
+primary_star.position = [500, 350, 80];
+primary_star.color = [255, 196, 62];
+primary_star.secondary_color = [232, 108, 34];
+primary_star.corona_count = 130;
+primary_star.turbulence = 0.008;
+primary_star.luminosity = 1.25;
+
+% configure inclined elliptical orbit using exponentiation
+planet_orbit = orbit();
+planet_orbit.center = primary_star.position;
+planet_orbit.radius = 16 ^ 2 + 19;
+planet_orbit.eccentricity = 0.18;
+planet_orbit.inclination = 0.36;
+planet_orbit.speed = 0.009;
+planet_orbit.color = [75, 125, 195];
+planet_orbit.show_trail = true;
+
+% configure tilted ringed cyan exoplanet with 0-based vector indexing
+orb_planet = planet();
+orb_planet.mass = 7.2e24;
+orb_planet.radius = 2 ^ 4 + 12;
+orb_planet.position = [775, 350, 0];
+orb_planet.position[2] = -25;
+orb_planet.color = [38, 212, 224];
+orb_planet.secondary_color = [30, 122, 198];
+orb_planet.polar_caps = true;
+orb_planet.spin_speed = 0.015;
+orb_planet.orbit = planet_orbit;
+
+exo_rings = rings();
+exo_rings.inner_radius = 46;
+exo_rings.outer_radius = 84;
+exo_rings.gap_inner = 62;
+exo_rings.gap_outer = 66;
+exo_rings.tilt = [0.46, 0.22, -0.1];
+exo_rings.color = [218, 190, 148];
+exo_rings.particle_count = 460;
+orb_planet.rings = exo_rings;
+
+% configure silver satellite orbiting the exoplanet without trail
+moon_orbit = orbit();
+moon_orbit.center = orb_planet.position;
+moon_orbit.radius = 102;
+moon_orbit.inclination = -0.32;
+moon_orbit.speed = 0.026;
+moon_orbit.show_trail = false;
+
+luna = satellite();
+luna.radius = 8;
+luna.color = [205, 216, 232];
+luna.parent = orb_planet;
+luna.orbit = moon_orbit;
+
+% configure distant crimson outer planet with unary minus inclination
+outer_orbit = orbit();
+outer_orbit.center = primary_star.position;
+outer_orbit.radius = 530;
+outer_orbit.eccentricity = 0.08;
+outer_orbit.inclination = -0.18;
+outer_orbit.speed = 0.004;
+outer_orbit.color = [135, 90, 175];
+outer_orbit.show_trail = true;
+
+outer_planet = planet();
+outer_planet.mass = 4.8e25;
+outer_planet.radius = 22;
+outer_planet.color = [228, 96, 78];
+outer_planet.secondary_color = [148, 52, 74];
+outer_planet.particle_count = 260;
+outer_planet.spin_speed = 0.012;
+outer_planet.orbit = outer_orbit;
+
+% launch simulation using configured duration
+simulate(sim.duration);
