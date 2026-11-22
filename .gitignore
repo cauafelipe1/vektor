@@ -1,0 +1,18 @@
+# c compiler build artifacts
+compiler/build/
+compiler/vektor
+compiler/*.o
+compiler/lex.yy.c
+compiler/parser.tab.c
+compiler/parser.tab.h
+vektor
+
+# generated python simulation outputs
+output/*.py
+
+# python and uv artifacts
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
