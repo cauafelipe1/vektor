@@ -1,0 +1,21 @@
+# build and dependency configuration for the vektor python runtime
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vektor"
+version = "0.1.0"
+description = "3d space simulation runtime for the vektor dsl"
+requires-python = ">=3.13"
+dependencies = [
+    "pygame-ce>=2.5.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["library"]
