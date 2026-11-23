@@ -32,6 +32,8 @@ from library.core.constants import (
     DEFAULT_HEIGHT,
     DEFAULT_WIDTH,
     NEAR_CLIP_Z,
+    SUPERNOVA_BURST_DURATION,
+    SUPERNOVA_UNSTABLE_DURATION,
 )
 from library.entities import RandomRegion
 from library.rendering import (
@@ -425,6 +427,58 @@ def test_entities_rings_gap_particle_modes_and_dt_scale() -> None:
     phase_before = pg_nebula._phases[0]
     pg_nebula.update(0.016, sim)
     assert pg_nebula._phases[0] > phase_before
+
+
+def test_star_supernova_phase_transitions() -> None:
+    # verify timed and flagged supernova lifecycle across all phases
+    sim = Simulation()
+    sim.dt_scale = 1.0
+    dying = star()
+    dying.particle_count = 40
+    dying.corona_count = 12
+    dying.burst_count = 60
+    dying.collapse_at = 1.0
+    dying.remnant = "nebula"
+    dying.initialize()
+    assert dying.phase == "stable"
+    assert dying._burst_particles == []
+
+    # remain stable before collapse_at
+    dying.update(0.4, sim)
+    assert dying.phase == "stable"
+    assert math.isclose(dying._life_time, 0.4, abs_tol=1e-9)
+
+    # cross collapse_at into unstable
+    dying.update(0.7, sim)
+    assert dying.phase == "unstable"
+
+    # finish unstable window and spawn burst debris
+    dying.update(SUPERNOVA_UNSTABLE_DURATION + 0.01, sim)
+    assert dying.phase == "burst"
+    assert len(dying._burst_particles) == 60
+
+    # finish burst window and settle into remnant nebula
+    dying.update(SUPERNOVA_BURST_DURATION + 0.01, sim)
+    assert dying.phase == "remnant"
+    assert len(dying._burst_particles) == 60
+
+    # verify go_supernova flag triggers collapse immediately when enabled
+    flash = star()
+    flash.particle_count = 20
+    flash.corona_count = 8
+    flash.burst_count = 30
+    flash.collapse_at = -1.0
+    flash.go_supernova = True
+    flash.remnant = "none"
+    flash.initialize()
+    flash.update(0.05, sim)
+    assert flash.phase == "unstable"
+    assert flash.go_supernova is False
+    flash.update(SUPERNOVA_UNSTABLE_DURATION + 0.01, sim)
+    assert flash.phase == "burst"
+    flash.update(SUPERNOVA_BURST_DURATION + 0.01, sim)
+    assert flash.phase == "remnant"
+    assert flash._burst_particles == []
 
 
 def test_headless_simulation_smoke(monkeypatch: pytest.MonkeyPatch) -> None:

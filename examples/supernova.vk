@@ -1,0 +1,48 @@
+% configure a timed stellar collapse into supernova remnant
+sim.name = "Supernova";
+sim.duration = 40;
+sim.width = 1280;
+sim.height = 720;
+sim.star_count = 280;
+sim.camera_position = [0, 0, -1080];
+sim.camera_pitch = 0.2;
+
+% distant dust cloud framing the unstable star
+dust = particle_group();
+dust.mode = "cloud";
+dust.count = 220;
+dust.color = [195, 205, 220];
+dust.spread = 1.4;
+dust.position = random([200, 140, -80], [1080, 580, 120]);
+
+% schedule collapse after a short stable burn-in
+primary_star = star();
+primary_star.mass = 3.1e30;
+primary_star.radius = 72;
+primary_star.position = [640, 360, 0];
+primary_star.color = [255, 196, 62];
+primary_star.secondary_color = [232, 108, 34];
+primary_star.corona_count = 140;
+primary_star.turbulence = 0.009;
+primary_star.luminosity = 1.3;
+primary_star.collapse_at = 4;
+primary_star.burst_count = 480;
+primary_star.remnant = "nebula";
+
+% outer rocky world still orbiting as the star dies
+world_orbit = orbit();
+world_orbit.center = primary_star.position;
+world_orbit.radius = 290;
+world_orbit.inclination = 0.12;
+world_orbit.speed = 0.01;
+world_orbit.show_trail = true;
+
+rocky = planet();
+rocky.mass = 4.1e24;
+rocky.radius = 18;
+rocky.color = [228, 96, 78];
+rocky.secondary_color = [175, 72, 58];
+rocky.particle_count = 220;
+rocky.orbit = world_orbit;
+
+simulate(sim.duration);
