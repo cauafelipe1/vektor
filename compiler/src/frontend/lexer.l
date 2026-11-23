@@ -1,3 +1,4 @@
+/* single file, track lines; suppress unused Flex helpers under -Werror */
 %option noyywrap yylineno nounput noinput
 
 %{
@@ -7,7 +8,7 @@
 #include "ast.h"
 #include "parser.tab.h"
 
-// duplicate matched token text and abort cleanly on allocation failure
+/* yytext is reused on the next token; copy the lexeme to the heap (abort on OOM) */
 static char *lex_strdup(const char *text) {
     char *copy = strdup(text);
     if (copy == NULL) {
@@ -34,12 +35,13 @@ static char *lex_strdup(const char *text) {
 [0-9]+(\.[0-9]+)?([eE][-+]?[0-9]+)?     { yylval.str_val = lex_strdup(yytext); return NUM; }
 \"([^\"\\\n]|\\.)*\"                    { yylval.str_val = lex_strdup(yytext); return STR; }
 \"([^\"\\\n]|\\.)*                      {
+                                            /* missing closing quote; YYerror hands control to the parser */
                                             fprintf(stderr, "[Vektor Lexical Error] Line %d: unterminated string literal\n", yylineno);
                                             return YYerror;
                                         }
 [a-zA-Z_][a-zA-Z0-9_]*                  { yylval.str_val = lex_strdup(yytext); return ID; }
 
-[=+\-*/^<>()\[\],;.]                    { return (unsigned char)yytext[0]; }
+[=+\-*/^<>()\[\],;.]                    { return yytext[0]; }
 
 .                                       {
                                             fprintf(stderr, "[Vektor Lexical Error] Line %d: unexpected character '%s'\n", yylineno, yytext);

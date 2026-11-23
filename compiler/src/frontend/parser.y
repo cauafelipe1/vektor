@@ -26,12 +26,14 @@ void yyerror(const char *s);
 
 %type <node> PROGRAM STMT_LIST STMT ASSIGN TARGET EXPR PRIMARY CALL VECTOR OPT_ARGS ARG_LIST
 
+/* on parse error, free stranded lexemes / partial AST; omit PROGRAM to avoid double-free with ast_root */
 %destructor { free($$); } ID NUM STR
 %destructor { ast_free($$); } STMT_LIST STMT ASSIGN TARGET EXPR PRIMARY CALL VECTOR OPT_ARGS ARG_LIST
 
 %left '<' '>' LE GE EQ NE
 %left '+' '-'
 %left '*' '/'
+/* UMINUS is not a token: precedence label so unary '-' binds tighter than binary '-' */
 %right UMINUS
 %right '^'
 
@@ -110,7 +112,7 @@ ARG_LIST
 
 %%
 
-// report syntax error with exact 1-based line number
+/* report syntax error with exact 1-based line number */
 void yyerror(const char *s) {
     fprintf(stderr, "[Vektor Syntax Error] Line %d: %s\n", yylineno, s);
 }
