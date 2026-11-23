@@ -2,7 +2,16 @@
 
 from collections.abc import Callable, Iterable, Sequence
 
+import pygame
+
 from ..core.constants import (
+    CAMERA_DOLLY_SPEED,
+    CAMERA_MOUSE_SENSITIVITY,
+    CAMERA_PAN_SPEED,
+    CAMERA_PITCH_MAX,
+    CAMERA_PITCH_MIN,
+    CAMERA_Z_MAX,
+    CAMERA_Z_MIN,
     DEFAULT_CAMERA_PITCH,
     DEFAULT_CAMERA_POSITION,
     DEFAULT_FOCAL_LENGTH,
@@ -30,6 +39,8 @@ class Camera3D:
             DEFAULT_CAMERA_POSITION if position is None else position,
             default_z=DEFAULT_CAMERA_POSITION[2],
         )
+        # orbit pivot z (xy pan lives in position[0]/[1]; distance in position[2])
+        self._pivot_z: float = 0.0
         self.yaw: float = float(yaw)
         self.pitch: float = float(pitch)
         self.roll: float = float(roll)
@@ -45,17 +56,83 @@ class Camera3D:
         # preserve existing camera depth z when assigning a 2d vector
         self._position = normalize_vec3(value, default_z=self._position[2])
 
+    def translate(self, dx: float, dy: float, dz: float = 0.0) -> None:
+        # pan xy offsets and dolly viewing depth z with near/far clamps
+        self._position[0] += float(dx)
+        self._position[1] += float(dy)
+        self._position[2] = min(
+            CAMERA_Z_MAX,
+            max(CAMERA_Z_MIN, self._position[2] + float(dz)),
+        )
+
+    def apply_keyboard_motion(self, pressed: object, dt_scale: float = 1.0) -> None:
+        # orbit pan along camera right/up; w/s dollies viewing distance only
+        scale = float(dt_scale)
+        pan = CAMERA_PAN_SPEED * scale
+        dolly = CAMERA_DOLLY_SPEED * scale
+        local_x = 0.0
+        local_y = 0.0
+        dolly_z = 0.0
+
+        def _held(key: int) -> bool:
+            try:
+                return bool(pressed[key])
+            except (IndexError, KeyError, TypeError):
+                return False
+
+        if _held(pygame.K_a) or _held(pygame.K_LEFT):
+            local_x -= pan
+        if _held(pygame.K_d) or _held(pygame.K_RIGHT):
+            local_x += pan
+        if _held(pygame.K_SPACE):
+            local_y -= pan
+        if _held(pygame.K_LSHIFT) or _held(pygame.K_RSHIFT):
+            local_y += pan
+        if _held(pygame.K_w) or _held(pygame.K_UP):
+            dolly_z += dolly
+        if _held(pygame.K_s) or _held(pygame.K_DOWN):
+            dolly_z -= dolly
+
+        if local_x or local_y:
+            # map view-space pan into orbit-pivot space (xy + pivot z)
+            # position[2] stays pure viewing distance and is not mixed into strafe
+            world_pan = rotate_vec3(
+                [local_x, local_y, 0.0],
+                self.yaw,
+                self.pitch,
+                self.roll,
+            )
+            self._position[0] += world_pan[0]
+            self._position[1] += world_pan[1]
+            self._pivot_z += world_pan[2]
+
+        if dolly_z:
+            self.translate(0.0, 0.0, dolly_z)
+
+    def rotate(self, dyaw: float, dpitch: float = 0.0) -> None:
+        # orbit yaw freely and clamp pitch to avoid flipping through the poles
+        self.yaw += float(dyaw)
+        self.pitch = min(
+            CAMERA_PITCH_MAX,
+            max(CAMERA_PITCH_MIN, self.pitch + float(dpitch)),
+        )
+
+    def apply_mouse_motion(self, dx: float, dy: float) -> None:
+        # map mouse drag deltas onto yaw/pitch; negate dy so mouse-up pitches up
+        sens = CAMERA_MOUSE_SENSITIVITY
+        self.rotate(float(dx) * sens, -float(dy) * sens)
+
     def world_to_camera(
         self,
         world_pos: Sequence[float],
         viewport_width: float = DEFAULT_WIDTH,
         viewport_height: float = DEFAULT_HEIGHT,
     ) -> list[float]:
-        # transform world coordinates into camera space orbiting the scene center
+        # orbit around the 3d pivot, then apply viewing distance along camera z
         wx, wy, wz = normalize_vec3(world_pos)
         ox = wx - viewport_width / 2.0 - self._position[0]
         oy = wy - viewport_height / 2.0 - self._position[1]
-        oz = wz
+        oz = wz - self._pivot_z
         rx, ry, rz = rotate_vec3([ox, oy, oz], -self.yaw, -self.pitch, -self.roll)
         cz = rz - self._position[2]
         return [rx, ry, cz]

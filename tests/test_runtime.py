@@ -19,6 +19,13 @@ from library import (
     star,
 )
 from library.core.constants import (
+    CAMERA_DOLLY_SPEED,
+    CAMERA_MOUSE_SENSITIVITY,
+    CAMERA_PAN_SPEED,
+    CAMERA_PITCH_MAX,
+    CAMERA_PITCH_MIN,
+    CAMERA_Z_MAX,
+    CAMERA_Z_MIN,
     DEFAULT_CAMERA_PITCH,
     DEFAULT_CAMERA_POSITION,
     DEFAULT_FOCAL_LENGTH,
@@ -186,6 +193,82 @@ def test_camera3d_z_preservation_projection_clipping_and_modifiers() -> None:
         ],
     )
     assert warped == [15.0, 40.0, 20.0]
+
+
+def test_camera3d_keyboard_pan_dolly_and_z_clamp() -> None:
+    # verify wasd/arrows/space/shift pan xy and dolly z with clamps
+    cam = Camera3D(pitch=0.0)
+    base_z = cam.position[2]
+
+    cam.apply_keyboard_motion({pygame.K_d: True}, dt_scale=1.0)
+    assert cam.position == [CAMERA_PAN_SPEED, 0.0, base_z]
+
+    cam.apply_keyboard_motion({pygame.K_LEFT: True}, dt_scale=1.0)
+    assert cam.position == [0.0, 0.0, base_z]
+
+    cam.apply_keyboard_motion({pygame.K_SPACE: True}, dt_scale=2.0)
+    assert cam.position == [0.0, -CAMERA_PAN_SPEED * 2.0, base_z]
+
+    cam.apply_keyboard_motion({pygame.K_LSHIFT: True}, dt_scale=2.0)
+    assert cam.position == [0.0, 0.0, base_z]
+
+    cam.apply_keyboard_motion({pygame.K_w: True}, dt_scale=1.0)
+    assert math.isclose(cam.position[2], base_z + CAMERA_DOLLY_SPEED)
+    assert cam.position[0] == 0.0 and cam.position[1] == 0.0
+
+    cam.apply_keyboard_motion({pygame.K_DOWN: True}, dt_scale=1.0)
+    assert math.isclose(cam.position[2], base_z)
+
+    # verify yaw-relative pan: 180 deg yaw reverses world-x strafe for a/d
+    cam.yaw = math.pi
+    cam.position = [0.0, 0.0, base_z]
+    cam._pivot_z = 0.0
+    cam.apply_keyboard_motion({pygame.K_d: True}, dt_scale=1.0)
+    assert math.isclose(cam.position[0], -CAMERA_PAN_SPEED, abs_tol=1e-9)
+    assert math.isclose(cam.position[1], 0.0, abs_tol=1e-9)
+    assert math.isclose(cam.position[2], base_z, abs_tol=1e-9)
+    assert math.isclose(cam._pivot_z, 0.0, abs_tol=1e-9)
+
+    # verify 90 deg yaw strafes via pivot z (not viewing distance) and moves camera-x
+    cam.yaw = math.pi / 2.0
+    cam.position = [0.0, 0.0, base_z]
+    cam._pivot_z = 0.0
+    center = [640.0, 360.0, 0.0]
+    before = cam.world_to_camera(center, DEFAULT_WIDTH, DEFAULT_HEIGHT)
+    cam.apply_keyboard_motion({pygame.K_d: True}, dt_scale=1.0)
+    after = cam.world_to_camera(center, DEFAULT_WIDTH, DEFAULT_HEIGHT)
+    assert math.isclose(cam.position[0], 0.0, abs_tol=1e-9)
+    assert math.isclose(cam.position[1], 0.0, abs_tol=1e-9)
+    assert math.isclose(cam.position[2], base_z, abs_tol=1e-9)
+    assert math.isclose(cam._pivot_z, -CAMERA_PAN_SPEED, abs_tol=1e-9)
+    assert after[0] < before[0]
+    assert math.isclose(after[1], before[1], abs_tol=1e-6)
+
+    # verify dolly clamp keeps camera safely beyond near clip depth
+    cam.translate(0.0, 0.0, 10_000.0)
+    assert cam.position[2] == CAMERA_Z_MAX
+    cam.translate(0.0, 0.0, -10_000.0)
+    assert cam.position[2] == CAMERA_Z_MIN
+
+    # verify 2d position assignment still preserves dolly z after motion
+    cam.position = [25, -10]
+    assert cam.position == [25.0, -10.0, CAMERA_Z_MIN]
+
+
+def test_camera3d_mouse_orbit_and_pitch_clamp() -> None:
+    # verify mouse drag orbits yaw/pitch and pitch stays within clamp range
+    cam = Camera3D(yaw=0.0, pitch=0.0)
+    cam.apply_mouse_motion(40.0, -20.0)
+    assert math.isclose(cam.yaw, 40.0 * CAMERA_MOUSE_SENSITIVITY)
+    assert math.isclose(cam.pitch, 20.0 * CAMERA_MOUSE_SENSITIVITY)
+
+    cam.rotate(0.0, 10.0)
+    assert cam.pitch == CAMERA_PITCH_MAX
+    cam.rotate(0.0, -10.0)
+    assert cam.pitch == CAMERA_PITCH_MIN
+
+    # verify position is untouched by orientation-only mouse orbit
+    assert cam.position == DEFAULT_CAMERA_POSITION
 
 
 def test_particle_renderer_back_to_front_sorting() -> None:

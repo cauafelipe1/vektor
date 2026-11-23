@@ -130,9 +130,17 @@ class Simulation:
                         running = False
                     elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                         running = False
+                    elif (
+                        event.type == pygame.MOUSEMOTION
+                        and event.buttons[2]
+                        and (event.rel[0] or event.rel[1])
+                    ):
+                        self.camera.apply_mouse_motion(event.rel[0], event.rel[1])
 
                 if not running:
                     break
+
+                self.camera.apply_keyboard_motion(pygame.key.get_pressed(), self.dt_scale)
 
                 screen.fill(COLOR_VOID)
                 starfield.update(dt, self.dt_scale)
