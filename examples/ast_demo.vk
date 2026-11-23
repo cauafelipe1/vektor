@@ -1,0 +1,14 @@
+% short grammar showcase for the interactive ast viewer
+% covers assign, attr, index, call, vector, literals, binop, unop, paren
+
+sim.name = "AST Demo";
+flag = true;
+pos = [1.5, 2, 3e1];
+pos[0] = -2 ^ 2;
+value = (pos[0] + 10) * 3 / 2;
+body = planet();
+body.mass = 5.0;
+body.position = pos;
+ok = value >= 0;
+ok = ok != false;
+simulate(1);

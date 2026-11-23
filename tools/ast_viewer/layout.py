@@ -1,8 +1,9 @@
-# top-down tree layout: measure subtree widths, then assign centered x/y positions
+# top-down tree layout: measure subtree widths with font metrics, center children
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Callable
 
 from tools.ast_viewer.model import AstTreeNode
 
@@ -22,45 +23,51 @@ class LayoutNode:
 # horizontal gap between sibling subtrees and vertical gap between levels
 H_GAP = 28.0
 V_GAP = 64.0
-# minimum box size; actual width grows with label length at layout time via char estimate
-CHAR_WIDTH = 8.5
-BOX_PAD_X = 16.0
-BOX_HEIGHT = 32.0
+BOX_PAD_X = 14.0
+BOX_PAD_Y = 8.0
+
+SizeFn = Callable[[str], tuple[float, float]]
 
 
-def _box_width(label: str) -> float:
-    # estimate node box width from label length
-    return max(72.0, len(label) * CHAR_WIDTH + BOX_PAD_X * 2)
+def display_label(node: AstTreeNode) -> str:
+    # same label used for measuring boxes and for drawing
+    label = node.label
+    if node.lineno > 0 and node.type_name in {"ASSIGN", "EXPR_STMT"}:
+        return f"{label}  L{node.lineno}"
+    return label
 
 
-def _measure(node: AstTreeNode) -> tuple[float, float]:
-    # return (subtree_width, box_width) for this node
-    box_w = _box_width(node.label)
+def _box_size(size_fn: SizeFn, label: str) -> tuple[float, float]:
+    # pad around the exact text metrics from the font
+    text_w, text_h = size_fn(label)
+    return text_w + BOX_PAD_X * 2, text_h + BOX_PAD_Y * 2
+
+
+def _measure(node: AstTreeNode, size_fn: SizeFn) -> tuple[float, float, float]:
+    # return (subtree_width, box_width, box_height) for this node
+    box_w, box_h = _box_size(size_fn, display_label(node))
     if not node.children:
-        return box_w, box_w
-    child_widths = [_measure(child)[0] for child in node.children]
+        return box_w, box_w, box_h
+    child_widths = [_measure(child, size_fn)[0] for child in node.children]
     children_span = sum(child_widths) + H_GAP * (len(child_widths) - 1)
-    return max(box_w, children_span), box_w
+    return max(box_w, children_span), box_w, box_h
 
 
-def _place(node: AstTreeNode, left: float, top: float) -> LayoutNode:
+def _place(node: AstTreeNode, left: float, top: float, size_fn: SizeFn) -> LayoutNode:
     # assign positions so children are centered under the parent
-    subtree_w, box_w = _measure(node)
-    box_h = BOX_HEIGHT
+    subtree_w, box_w, box_h = _measure(node, size_fn)
     center_x = left + subtree_w / 2.0
     x = center_x - box_w / 2.0
     y = top
 
     child_layouts: list[LayoutNode] = []
     if node.children:
-        child_left = left + (subtree_w - (
-            sum(_measure(c)[0] for c in node.children)
-            + H_GAP * (len(node.children) - 1)
-        )) / 2.0
+        child_spans = [_measure(c, size_fn)[0] for c in node.children]
+        children_span = sum(child_spans) + H_GAP * (len(child_spans) - 1)
+        child_left = left + (subtree_w - children_span) / 2.0
         cursor = child_left
-        for child in node.children:
-            child_span, _ = _measure(child)
-            child_layouts.append(_place(child, cursor, top + box_h + V_GAP))
+        for child, child_span in zip(node.children, child_spans, strict=True):
+            child_layouts.append(_place(child, cursor, top + box_h + V_GAP, size_fn))
             cursor += child_span + H_GAP
 
     return LayoutNode(
@@ -73,9 +80,9 @@ def _place(node: AstTreeNode, left: float, top: float) -> LayoutNode:
     )
 
 
-def layout_tree(root: AstTreeNode) -> LayoutNode:
+def layout_tree(root: AstTreeNode, size_fn: SizeFn) -> LayoutNode:
     # produce a fully positioned layout tree rooted at (0, 0)
-    return _place(root, 0.0, 0.0)
+    return _place(root, 0.0, 0.0, size_fn)
 
 
 def iter_layout_nodes(node: LayoutNode):
