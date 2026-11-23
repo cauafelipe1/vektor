@@ -18,7 +18,7 @@ extern int yylex_destroy(void);
 static void print_usage(FILE *stream, const char *prog_name) {
     fprintf(
         stream,
-        "usage: %s [--emit-only] [--dump-ast] [-o <output.py>] [-h|--help] <input.vk>\n",
+        "usage: %s [--emit-only] [--dump-ast] [--dump-ast-text] [-o <output.py>] [-h|--help] <input.vk>\n",
         prog_name
     );
 }
@@ -84,10 +84,78 @@ static int run_generated_script(char *output_path) {
     return WIFEXITED(status) ? WEXITSTATUS(status) : 1;
 }
 
+// write ast json to a temp file and launch the interactive pygame viewer
+static int run_ast_viewer(const ASTNode *root) {
+    char temp_path[] = "/tmp/vektor_ast_XXXXXX";
+    int fd = mkstemp(temp_path);
+    if (fd < 0) {
+        fprintf(stderr, "[Vektor IO Error] cannot create temporary ast json: %s\n", strerror(errno));
+        return 1;
+    }
+
+    FILE *json_file = fdopen(fd, "w");
+    if (json_file == NULL) {
+        fprintf(stderr, "[Vektor IO Error] cannot open temporary ast json: %s\n", strerror(errno));
+        close(fd);
+        unlink(temp_path);
+        return 1;
+    }
+
+    if (ast_dump_json(root, json_file) != 0) {
+        fprintf(stderr, "[Vektor IO Error] failed writing temporary ast json\n");
+        fclose(json_file);
+        unlink(temp_path);
+        return 1;
+    }
+    if (fclose(json_file) != 0) {
+        fprintf(stderr, "[Vektor IO Error] failed closing temporary ast json: %s\n", strerror(errno));
+        unlink(temp_path);
+        return 1;
+    }
+
+    char *exec_argv[] = {
+        "uv",
+        "run",
+        "python",
+        "-m",
+        "tools.ast_viewer",
+        "--json",
+        temp_path,
+        NULL
+    };
+    pid_t pid = fork();
+    if (pid < 0) {
+        fprintf(stderr, "[Vektor Runtime Error] fork failed: %s\n", strerror(errno));
+        unlink(temp_path);
+        return 1;
+    }
+    if (pid == 0) {
+        execvp("uv", exec_argv);
+        fprintf(stderr, "[Vektor Runtime Error] failed to execute uv: %s\n", strerror(errno));
+        _exit(127);
+    }
+
+    int status = 0;
+    pid_t waited;
+    do {
+        waited = waitpid(pid, &status, 0);
+    } while (waited < 0 && errno == EINTR);
+
+    unlink(temp_path);
+
+    if (waited < 0) {
+        fprintf(stderr, "[Vektor Runtime Error] waitpid failed: %s\n", strerror(errno));
+        return 1;
+    }
+
+    return WIFEXITED(status) ? WEXITSTATUS(status) : 1;
+}
+
 // parse cli arguments, transpile input .vk to python, and optionally execute it
 int main(int argc, char **argv) {
     int emit_only = 0;
     int dump_ast = 0;
+    int dump_ast_text = 0;
     char *output_path = NULL;
     char *allocated_output = NULL;
     const char *input_path = NULL;
@@ -103,6 +171,10 @@ int main(int argc, char **argv) {
         }
         if (strcmp(argv[i], "--dump-ast") == 0) {
             dump_ast = 1;
+            continue;
+        }
+        if (strcmp(argv[i], "--dump-ast-text") == 0) {
+            dump_ast_text = 1;
             continue;
         }
         if (strcmp(argv[i], "-o") == 0) {
@@ -154,15 +226,27 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if (dump_ast) {
+    // standalone text dump for ci / scripts
+    if (dump_ast_text && !emit_only && output_path == NULL && !dump_ast) {
         ast_dump(ast_root, 0);
-        // exit cleanly after dumping ast unless python output emission was also requested
-        if (!emit_only && output_path == NULL) {
-            ast_free(ast_root);
-            ast_root = NULL;
-            yylex_destroy();
-            return 0;
-        }
+        ast_free(ast_root);
+        ast_root = NULL;
+        yylex_destroy();
+        return 0;
+    }
+
+    // standalone interactive viewer (blocks until the window closes)
+    if (dump_ast && !emit_only && output_path == NULL) {
+        int viewer_status = run_ast_viewer(ast_root);
+        ast_free(ast_root);
+        ast_root = NULL;
+        yylex_destroy();
+        return viewer_status;
+    }
+
+    // combined with emit: keep textual dump on stdout, then continue
+    if (dump_ast || dump_ast_text) {
+        ast_dump(ast_root, 0);
     }
 
     if (output_path == NULL) {

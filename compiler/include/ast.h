@@ -109,6 +109,7 @@ ASTNode *ast_new_paren(ASTNode *expr, int lineno);
 // list, debug printing, and memory management helpers
 ASTNode *ast_append_node(ASTNode *list, ASTNode *item);
 void ast_dump(const ASTNode *node, int indent);
+int ast_dump_json(const ASTNode *node, FILE *out);
 void ast_free(ASTNode *node);
 
 #endif

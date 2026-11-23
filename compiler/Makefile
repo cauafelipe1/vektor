@@ -56,10 +56,10 @@ $(BUILD_DIR)/main.o: src/cli/main.c include/ast.h include/codegen.h
 clean:
 	rm -rf $(TARGET) $(BUILD_DIR)
 
-# run smoke ast dump and transpilation check when reference example is present
+# run smoke ast text dump and transpilation check when reference example is present
 test: $(TARGET)
 	@if [ -f ../examples/solar_system.vk ]; then \
-		./$(TARGET) --dump-ast ../examples/solar_system.vk > /dev/null && \
+		./$(TARGET) --dump-ast-text ../examples/solar_system.vk > /dev/null && \
 		./$(TARGET) --emit-only -o /tmp/vektor_smoke.py ../examples/solar_system.vk && \
 		rm -f /tmp/vektor_smoke.py; \
 	fi

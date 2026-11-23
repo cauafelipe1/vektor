@@ -15,7 +15,7 @@ Bison LALR(1) Parser (compiler/src/frontend/parser.y)
   │  validates grammar with declarative precedence (0 conflicts) and builds the AST
   ▼
 C11 AST (compiler/include/ast.h, compiler/src/ir/ast.c)
-  │  structured intermediate representation supporting --dump-ast inspection
+  │  structured intermediate representation supporting --dump-ast viewer / text dump
   ▼
 Python 3 Codegen (compiler/include/codegen.h, compiler/src/backend/codegen.c)
   │  emits Python 3 source into output/<name>.py (header injection, ^ -> **, 0-based indexing)
@@ -31,7 +31,7 @@ vektor/
 ├── compiler/
 │   ├── Makefile                # builds compiler/vektor into build/ intermediates
 │   ├── include/
-│   │   ├── ast.h               # ast node types, constructors, ast_dump, ast_free
+│   │   ├── ast.h               # ast node types, constructors, ast_dump, ast_dump_json, ast_free
 │   │   └── codegen.h           # python emitter interface
 │   └── src/
 │       ├── frontend/
@@ -42,7 +42,9 @@ vektor/
 │       ├── backend/
 │       │   └── codegen.c       # ast traversal and python 3 emission
 │       └── cli/
-│           └── main.c          # cli driver and uv runtime launcher
+│           └── main.c          # cli driver, ast viewer launcher, and uv runtime launcher
+├── tools/
+│   └── ast_viewer/             # interactive pygame ast tree viewer (zoom/pan; separate from simulation)
 ├── library/
 │   ├── __init__.py             # public dsl exports (9 symbols)
 │   ├── core/
@@ -105,21 +107,25 @@ Compile and run a `.vk` simulation directly:
 ### CLI Options
 
 ```text
-vektor [--emit-only] [--dump-ast] [-o <output.py>] [-h|--help] <input.vk>
+vektor [--emit-only] [--dump-ast] [--dump-ast-text] [-o <output.py>] [-h|--help] <input.vk>
 ```
 
 | Option | Description |
 | :--- | :--- |
 | `--emit-only` | Transpile the `.vk` input into Python without launching the simulation runtime. |
-| `--dump-ast` | Print the parsed Abstract Syntax Tree to `stdout`. When used alone, exits without writing `.py` or launching Pygame. |
+| `--dump-ast` | Open an interactive Pygame AST tree viewer (zoom/pan). When used alone, exits without writing `.py` or launching the simulation. Combined with `--emit-only`/`-o`, prints the textual AST to `stdout` then continues. |
+| `--dump-ast-text` | Print the parsed Abstract Syntax Tree to `stdout` (useful for CI/scripts). When used alone, exits without writing `.py`. |
 | `-o <output.py>` | Write the generated Python script to an explicit path instead of `output/<stem>.py`. |
 | `-h`, `--help` | Display usage instructions and exit. |
 
 Examples:
 
 ```bash
-# inspect the AST without generating Python or opening a window
+# open the interactive AST viewer (scroll to zoom, drag to pan)
 ./compiler/vektor --dump-ast examples/solar_system.vk
+
+# print the textual AST without generating Python or opening a window
+./compiler/vektor --dump-ast-text examples/solar_system.vk
 
 # emit Python code only
 ./compiler/vektor --emit-only -o output/solar_system.py examples/solar_system.vk

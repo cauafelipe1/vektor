@@ -70,7 +70,11 @@ GOLDEN_SNIPPET_PY = (
 )
 
 
-def run_compiler(args: list[str], cwd: Path = REPO_ROOT) -> subprocess.CompletedProcess[str]:
+def run_compiler(
+    args: list[str],
+    cwd: Path = REPO_ROOT,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     # invoke the compiled vektor binary in the specified working directory
     return subprocess.run(
         [str(COMPILER_BIN), *args],
@@ -78,6 +82,7 @@ def run_compiler(args: list[str], cwd: Path = REPO_ROOT) -> subprocess.Completed
         capture_output=True,
         text=True,
         check=False,
+        env=env,
     )
 
 
@@ -114,13 +119,25 @@ def test_golden_deterministic_emission(tmp_path: Path) -> None:
     ast.parse(emitted)
 
 
-def test_dump_ast_standalone_without_output_or_runtime(tmp_path: Path) -> None:
-    # verify standalone --dump-ast prints hierarchical ast nodes without emitting or running python
-    result = run_compiler(["--dump-ast", str(SOLAR_SYSTEM_VK)], cwd=tmp_path)
+def test_dump_ast_text_standalone_without_output_or_runtime(tmp_path: Path) -> None:
+    # verify standalone --dump-ast-text prints hierarchical ast nodes without emitting or running python
+    result = run_compiler(["--dump-ast-text", str(SOLAR_SYSTEM_VK)], cwd=tmp_path)
     assert result.returncode == 0, result.stderr
     for token in ("PROGRAM", "ASSIGN", "CALL", "ATTR", "VECTOR", "INDEX", "BINOP", "BOOL"):
         assert token in result.stdout
     assert not (tmp_path / "output").exists()
+
+
+def test_dump_ast_viewer_headless_smoke() -> None:
+    # verify standalone --dump-ast launches the pygame viewer and exits under dummy sdl
+    import os
+
+    env = os.environ.copy()
+    env["SDL_VIDEODRIVER"] = "dummy"
+    env["SDL_AUDIODRIVER"] = "dummy"
+    env["VEKTOR_MAX_FRAMES"] = "1"
+    result = run_compiler(["--dump-ast", str(SOLAR_SYSTEM_VK)], cwd=REPO_ROOT, env=env)
+    assert result.returncode == 0, result.stderr
 
 
 def test_dump_ast_combined_with_emit_only(tmp_path: Path) -> None:
@@ -299,10 +316,11 @@ def test_cli_argument_validation_errors(cli_args: list[str]) -> None:
 
 
 def test_cli_help_flag() -> None:
-    # verify -h and --help exit cleanly with usage text advertising --dump-ast
+    # verify -h and --help exit cleanly with usage text advertising dump-ast flags
     for flag in ("-h", "--help"):
         result = run_compiler([flag])
         assert result.returncode == 0
         assert "usage:" in result.stdout
         assert "--dump-ast" in result.stdout
+        assert "--dump-ast-text" in result.stdout
         assert "--emit-only" in result.stdout

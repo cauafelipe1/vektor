@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "ast.h"
 
 // global root populated by bison after parsing succeeds
@@ -239,6 +240,317 @@ void ast_dump(const ASTNode *node, int indent) {
         }
         node = node->next;
     }
+}
+
+// write a json string with escaped quotes and control characters
+static int ast_json_write_string(FILE *out, const char *text) {
+    if (fputc('"', out) == EOF) {
+        return -1;
+    }
+    if (text != NULL) {
+        for (const unsigned char *p = (const unsigned char *)text; *p != '\0'; p++) {
+            unsigned char c = *p;
+            if (c == '"' || c == '\\') {
+                if (fputc('\\', out) == EOF || fputc((int)c, out) == EOF) {
+                    return -1;
+                }
+            } else if (c == '\n') {
+                if (fputs("\\n", out) == EOF) {
+                    return -1;
+                }
+            } else if (c == '\r') {
+                if (fputs("\\r", out) == EOF) {
+                    return -1;
+                }
+            } else if (c == '\t') {
+                if (fputs("\\t", out) == EOF) {
+                    return -1;
+                }
+            } else if (c < 0x20) {
+                if (fprintf(out, "\\u%04x", c) < 0) {
+                    return -1;
+                }
+            } else if (fputc((int)c, out) == EOF) {
+                return -1;
+            }
+        }
+    }
+    if (fputc('"', out) == EOF) {
+        return -1;
+    }
+    return 0;
+}
+
+// map an ast node type to a stable json type name
+static const char *ast_type_name(ASTNodeType type) {
+    switch (type) {
+        case NODE_PROGRAM:
+            return "PROGRAM";
+        case NODE_ASSIGN:
+            return "ASSIGN";
+        case NODE_EXPR_STMT:
+            return "EXPR_STMT";
+        case NODE_BINOP:
+            return "BINOP";
+        case NODE_UNOP:
+            return "UNOP";
+        case NODE_CALL:
+            return "CALL";
+        case NODE_VECTOR:
+            return "VECTOR";
+        case NODE_ATTR:
+            return "ATTR";
+        case NODE_INDEX:
+            return "INDEX";
+        case NODE_ID:
+            return "ID";
+        case NODE_NUM:
+            return "NUM";
+        case NODE_STR:
+            return "STR";
+        case NODE_BOOL:
+            return "BOOL";
+        case NODE_PAREN:
+            return "PAREN";
+    }
+    return "UNKNOWN";
+}
+
+// build the display label for one node (matches textual ast_dump style)
+static void ast_format_label(const ASTNode *node, char *buf, size_t buf_size) {
+    switch (node->type) {
+        case NODE_PROGRAM:
+            snprintf(buf, buf_size, "PROGRAM");
+            break;
+        case NODE_ASSIGN:
+            snprintf(buf, buf_size, "ASSIGN");
+            break;
+        case NODE_EXPR_STMT:
+            snprintf(buf, buf_size, "EXPR_STMT");
+            break;
+        case NODE_BINOP:
+            snprintf(buf, buf_size, "BINOP(%s)", ast_op_str(node->data.binop.op));
+            break;
+        case NODE_UNOP:
+            snprintf(buf, buf_size, "UNOP(%s)", ast_op_str(node->data.unop.op));
+            break;
+        case NODE_CALL:
+            snprintf(
+                buf,
+                buf_size,
+                "CALL(%s)",
+                node->data.call.callee != NULL ? node->data.call.callee : ""
+            );
+            break;
+        case NODE_VECTOR:
+            snprintf(buf, buf_size, "VECTOR");
+            break;
+        case NODE_ATTR:
+            snprintf(
+                buf,
+                buf_size,
+                "ATTR(.%s)",
+                node->data.attr.attr_name != NULL ? node->data.attr.attr_name : ""
+            );
+            break;
+        case NODE_INDEX:
+            snprintf(buf, buf_size, "INDEX");
+            break;
+        case NODE_ID:
+            snprintf(
+                buf,
+                buf_size,
+                "ID(%s)",
+                node->data.literal.str_val != NULL ? node->data.literal.str_val : ""
+            );
+            break;
+        case NODE_NUM:
+            snprintf(
+                buf,
+                buf_size,
+                "NUM(%s)",
+                node->data.literal.str_val != NULL ? node->data.literal.str_val : ""
+            );
+            break;
+        case NODE_STR:
+            snprintf(
+                buf,
+                buf_size,
+                "STR(%s)",
+                node->data.literal.str_val != NULL ? node->data.literal.str_val : ""
+            );
+            break;
+        case NODE_BOOL:
+            snprintf(buf, buf_size, "BOOL(%s)", node->data.boolean.bool_val ? "true" : "false");
+            break;
+        case NODE_PAREN:
+            snprintf(buf, buf_size, "PAREN");
+            break;
+    }
+}
+
+static int ast_dump_json_node(const ASTNode *node, FILE *out);
+static int ast_dump_json_siblings(const ASTNode *node, FILE *out);
+
+// write a sibling-linked list as a json array of node objects
+static int ast_dump_json_siblings(const ASTNode *node, FILE *out) {
+    if (fputc('[', out) == EOF) {
+        return -1;
+    }
+    int first = 1;
+    while (node != NULL) {
+        if (!first && fputc(',', out) == EOF) {
+            return -1;
+        }
+        first = 0;
+        if (ast_dump_json_node(node, out) != 0) {
+            return -1;
+        }
+        node = node->next;
+    }
+    if (fputc(']', out) == EOF) {
+        return -1;
+    }
+    return 0;
+}
+
+// write one ast node object; sibling chain is handled by the caller
+static int ast_dump_json_node(const ASTNode *node, FILE *out) {
+    char label[512];
+    ast_format_label(node, label, sizeof(label));
+
+    if (fputc('{', out) == EOF) {
+        return -1;
+    }
+    if (fputs("\"type\":", out) == EOF || ast_json_write_string(out, ast_type_name(node->type)) != 0) {
+        return -1;
+    }
+    if (fputs(",\"label\":", out) == EOF || ast_json_write_string(out, label) != 0) {
+        return -1;
+    }
+    if (fprintf(out, ",\"lineno\":%d,\"children\":", node->lineno) < 0) {
+        return -1;
+    }
+
+    switch (node->type) {
+        case NODE_PROGRAM:
+            if (ast_dump_json_siblings(node->data.program.statements, out) != 0) {
+                return -1;
+            }
+            break;
+        case NODE_ASSIGN:
+            if (fputc('[', out) == EOF) {
+                return -1;
+            }
+            if (node->data.assign.target != NULL) {
+                if (ast_dump_json_node(node->data.assign.target, out) != 0) {
+                    return -1;
+                }
+            }
+            if (fputc(',', out) == EOF) {
+                return -1;
+            }
+            if (node->data.assign.value != NULL) {
+                if (ast_dump_json_node(node->data.assign.value, out) != 0) {
+                    return -1;
+                }
+            }
+            if (fputc(']', out) == EOF) {
+                return -1;
+            }
+            break;
+        case NODE_EXPR_STMT:
+            if (ast_dump_json_siblings(node->data.expr_stmt.expr, out) != 0) {
+                return -1;
+            }
+            break;
+        case NODE_BINOP:
+            if (fputc('[', out) == EOF) {
+                return -1;
+            }
+            if (node->data.binop.left != NULL && ast_dump_json_node(node->data.binop.left, out) != 0) {
+                return -1;
+            }
+            if (fputc(',', out) == EOF) {
+                return -1;
+            }
+            if (node->data.binop.right != NULL && ast_dump_json_node(node->data.binop.right, out) != 0) {
+                return -1;
+            }
+            if (fputc(']', out) == EOF) {
+                return -1;
+            }
+            break;
+        case NODE_UNOP:
+            if (ast_dump_json_siblings(node->data.unop.operand, out) != 0) {
+                return -1;
+            }
+            break;
+        case NODE_CALL:
+            if (ast_dump_json_siblings(node->data.call.args, out) != 0) {
+                return -1;
+            }
+            break;
+        case NODE_VECTOR:
+            if (ast_dump_json_siblings(node->data.vector.elements, out) != 0) {
+                return -1;
+            }
+            break;
+        case NODE_ATTR:
+            if (ast_dump_json_siblings(node->data.attr.object, out) != 0) {
+                return -1;
+            }
+            break;
+        case NODE_INDEX:
+            if (fputc('[', out) == EOF) {
+                return -1;
+            }
+            if (node->data.index.target != NULL && ast_dump_json_node(node->data.index.target, out) != 0) {
+                return -1;
+            }
+            if (fputc(',', out) == EOF) {
+                return -1;
+            }
+            if (node->data.index.index != NULL && ast_dump_json_node(node->data.index.index, out) != 0) {
+                return -1;
+            }
+            if (fputc(']', out) == EOF) {
+                return -1;
+            }
+            break;
+        case NODE_PAREN:
+            if (ast_dump_json_siblings(node->data.paren.expr, out) != 0) {
+                return -1;
+            }
+            break;
+        case NODE_ID:
+        case NODE_NUM:
+        case NODE_STR:
+        case NODE_BOOL:
+            if (fputs("[]", out) == EOF) {
+                return -1;
+            }
+            break;
+    }
+
+    if (fputc('}', out) == EOF) {
+        return -1;
+    }
+    return 0;
+}
+
+// serialize one ast root (and its nested children) as a single json object
+int ast_dump_json(const ASTNode *node, FILE *out) {
+    if (node == NULL || out == NULL) {
+        return -1;
+    }
+    if (ast_dump_json_node(node, out) != 0) {
+        return -1;
+    }
+    if (fputc('\n', out) == EOF) {
+        return -1;
+    }
+    return 0;
 }
 
 // recursively free an ast node and its sibling chain iteratively
