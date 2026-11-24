@@ -1,117 +1,245 @@
-% configure 3d solar system simulation parameters
+% configure 3d solar system simulation parameters and camera framing
 sim.name = "Solar System";
 sim.duration = 120;
 sim.gravity = 9.81;
 sim.width = 1280;
 sim.height = 720;
-sim.star_count = 320;
-sim.camera_position = [0, 0, -1080];
-sim.camera_pitch = 0.22;
+sim.star_count = 340;
+sim.camera_position = [0, 0, -1680];
+sim.camera_pitch = 0.26;
 
 % instantiate central golden-amber star
 primary_star = star();
 primary_star.mass = 1.989e30;
-primary_star.radius = 68;
+primary_star.radius = 54;
 primary_star.position = [640, 360, 0];
 primary_star.color = [255, 196, 62];
 primary_star.secondary_color = [232, 108, 34];
+primary_star.particle_count = 720;
 primary_star.corona_count = 120;
 primary_star.turbulence = 0.007;
 primary_star.luminosity = 1.25;
 
-% configure inner rocky coral planet and orbit
-inner_orbit = orbit();
-inner_orbit.center = primary_star.position;
-inner_orbit.radius = 155;
-inner_orbit.inclination = 0.08;
-inner_orbit.speed = 0.015;
-inner_orbit.color = [110, 145, 200];
-inner_orbit.show_trail = true;
+% configure mercury and its eccentric inner orbit
+mercury_orbit = orbit();
+mercury_orbit.center = primary_star.position;
+mercury_orbit.radius = 95;
+mercury_orbit.eccentricity = 0.20;
+mercury_orbit.inclination = 0.12;
+mercury_orbit.speed = 0.024;
+mercury_orbit.color = [130, 126, 122];
+mercury_orbit.show_trail = true;
 
-rocky_planet = planet();
-rocky_planet.mass = 3.3e23;
-rocky_planet.radius = 15;
-rocky_planet.color = [228, 96, 78];
-rocky_planet.secondary_color = [175, 72, 58];
-rocky_planet.particle_count = 200;
-rocky_planet.spin_speed = 0.018;
-rocky_planet.orbit = inner_orbit;
+mercury = planet();
+mercury.mass = 3.301e23;
+mercury.radius = 9;
+mercury.color = [168, 162, 156];
+mercury.secondary_color = [118, 112, 108];
+mercury.particle_count = 110;
+mercury.spin_speed = 0.008;
+mercury.orbit = mercury_orbit;
 
-% configure oceanic teal planet with polar caps and orbiting moon
-ocean_orbit = orbit();
-ocean_orbit.center = primary_star.position;
-ocean_orbit.radius = 270;
-ocean_orbit.inclination = -0.06;
-ocean_orbit.speed = 0.009;
-ocean_orbit.color = [75, 125, 195];
-ocean_orbit.show_trail = true;
+% configure venus with retrograde spin
+venus_orbit = orbit();
+venus_orbit.center = primary_star.position;
+venus_orbit.radius = 145;
+venus_orbit.eccentricity = 0.01;
+venus_orbit.inclination = -0.06;
+venus_orbit.speed = 0.018;
+venus_orbit.color = [175, 148, 102];
+venus_orbit.show_trail = true;
 
-ocean_planet = planet();
-ocean_planet.mass = 5.972e24;
-ocean_planet.radius = 26;
-ocean_planet.color = [38, 212, 224];
-ocean_planet.secondary_color = [30, 122, 198];
-ocean_planet.polar_caps = true;
-ocean_planet.particle_count = 320;
-ocean_planet.spin_speed = 0.014;
-ocean_planet.orbit = ocean_orbit;
+venus = planet();
+venus.mass = 4.867e24;
+venus.radius = 16;
+venus.color = [238, 198, 124];
+venus.secondary_color = [196, 142, 76];
+venus.particle_count = 190;
+venus.spin_speed = -0.006;
+venus.orbit = venus_orbit;
+
+% configure earth with polar caps and orbiting moon
+earth_orbit = orbit();
+earth_orbit.center = primary_star.position;
+earth_orbit.radius = 210;
+earth_orbit.eccentricity = 0.02;
+earth_orbit.inclination = -0.05;
+earth_orbit.speed = 0.014;
+earth_orbit.color = [75, 125, 195];
+earth_orbit.show_trail = true;
+
+earth = planet();
+earth.mass = 5.972e24;
+earth.radius = 18;
+earth.color = [38, 212, 224];
+earth.secondary_color = [30, 122, 198];
+earth.polar_caps = true;
+earth.particle_count = 240;
+earth.spin_speed = 0.016;
+earth.orbit = earth_orbit;
 
 moon_orbit = orbit();
-moon_orbit.center = ocean_planet.position;
-moon_orbit.radius = 52;
+moon_orbit.center = earth.position;
+moon_orbit.radius = 34;
 moon_orbit.inclination = 0.25;
-moon_orbit.speed = 0.032;
+moon_orbit.speed = 0.042;
 moon_orbit.show_trail = false;
 
-ocean_moon = satellite();
-ocean_moon.radius = 7;
-ocean_moon.color = [205, 216, 232];
-ocean_moon.particle_count = 65;
-ocean_moon.parent = ocean_planet;
-ocean_moon.orbit = moon_orbit;
+moon = satellite();
+moon.mass = 7.342e22;
+moon.radius = 5;
+moon.color = [205, 216, 232];
+moon.particle_count = 50;
+moon.parent = earth;
+moon.orbit = moon_orbit;
 
-% configure 3d toroidal asteroid belt with arithmetic and 0-based indexing
+% configure mars with polar caps and rusty palette
+mars_orbit = orbit();
+mars_orbit.center = primary_star.position;
+mars_orbit.radius = 275;
+mars_orbit.eccentricity = 0.09;
+mars_orbit.inclination = 0.07;
+mars_orbit.speed = 0.011;
+mars_orbit.color = [165, 92, 82];
+mars_orbit.show_trail = true;
+
+mars = planet();
+mars.mass = 6.417e23;
+mars.radius = 13;
+mars.color = [228, 96, 78];
+mars.secondary_color = [162, 64, 48];
+mars.polar_caps = true;
+mars.particle_count = 160;
+mars.spin_speed = 0.015;
+mars.orbit = mars_orbit;
+
+% configure 3d toroidal main asteroid belt with arithmetic and 0-based indexing
 belt = particle_group();
 belt.mode = "belt";
 belt.center = [640, 360, 0];
 belt.center[2] = 0;
-belt.inner_radius = 355;
-belt.outer_radius = 405;
-belt.thickness = 28;
+belt.inner_radius = 325;
+belt.outer_radius = 375;
+belt.thickness = 26;
 belt.count = 360;
 belt.mass = 0.5;
 belt.total_mass = belt.count * belt.mass;
 belt.angular_speed = 0.0025;
 belt.color = [195, 205, 220];
 
-% configure outer ringed sandstone gas giant with division gap
-giant_orbit = orbit();
-giant_orbit.center = primary_star.position;
-giant_orbit.radius = 510;
-giant_orbit.inclination = 0.11;
-giant_orbit.speed = 0.0045;
-giant_orbit.color = [95, 130, 185];
-giant_orbit.show_trail = true;
+% configure jupiter gas giant
+jupiter_orbit = orbit();
+jupiter_orbit.center = primary_star.position;
+jupiter_orbit.radius = 465;
+jupiter_orbit.eccentricity = 0.05;
+jupiter_orbit.inclination = 0.04;
+jupiter_orbit.speed = 0.0075;
+jupiter_orbit.color = [155, 126, 98];
+jupiter_orbit.show_trail = true;
 
-gas_giant = planet();
-gas_giant.mass = 5.683e26;
-gas_giant.radius = 38;
-gas_giant.color = [220, 188, 142];
-gas_giant.secondary_color = [184, 140, 96];
-gas_giant.particle_count = 420;
-gas_giant.spin_speed = 0.011;
-gas_giant.orbit = giant_orbit;
+jupiter = planet();
+jupiter.mass = 1.898e27;
+jupiter.radius = 38;
+jupiter.color = [226, 176, 126];
+jupiter.secondary_color = [172, 104, 68];
+jupiter.particle_count = 420;
+jupiter.spin_speed = 0.022;
+jupiter.orbit = jupiter_orbit;
 
-giant_rings = rings();
-giant_rings.inner_radius = 56;
-giant_rings.outer_radius = 98;
-giant_rings.gap_inner = 76;
-giant_rings.gap_outer = 81;
-giant_rings.tilt = [0.42, 0.18, -0.08];
-giant_rings.color = [218, 190, 148];
-giant_rings.secondary_color = [165, 138, 108];
-giant_rings.particle_count = 520;
-gas_giant.rings = giant_rings;
+% configure saturn with divided rings
+saturn_orbit = orbit();
+saturn_orbit.center = primary_star.position;
+saturn_orbit.radius = 605;
+saturn_orbit.eccentricity = 0.06;
+saturn_orbit.inclination = 0.09;
+saturn_orbit.speed = 0.0055;
+saturn_orbit.color = [165, 146, 114];
+saturn_orbit.show_trail = true;
+
+saturn = planet();
+saturn.mass = 5.683e26;
+saturn.radius = 32;
+saturn.color = [224, 194, 144];
+saturn.secondary_color = [184, 148, 102];
+saturn.particle_count = 360;
+saturn.spin_speed = 0.018;
+saturn.orbit = saturn_orbit;
+
+saturn_rings = rings();
+saturn_rings.inner_radius = 46;
+saturn_rings.outer_radius = 84;
+saturn_rings.gap_inner = 64;
+saturn_rings.gap_outer = 69;
+saturn_rings.tilt = [0.42, 0.18, -0.08];
+saturn_rings.color = [218, 190, 148];
+saturn_rings.secondary_color = [165, 138, 108];
+saturn_rings.particle_count = 460;
+saturn.rings = saturn_rings;
+
+% configure uranus with steeply tilted rings
+uranus_orbit = orbit();
+uranus_orbit.center = primary_star.position;
+uranus_orbit.radius = 735;
+uranus_orbit.eccentricity = 0.05;
+uranus_orbit.inclination = -0.07;
+uranus_orbit.speed = 0.0040;
+uranus_orbit.color = [92, 162, 182];
+uranus_orbit.show_trail = true;
+
+uranus = planet();
+uranus.mass = 8.681e25;
+uranus.radius = 23;
+uranus.color = [132, 224, 236];
+uranus.secondary_color = [86, 178, 204];
+uranus.particle_count = 250;
+uranus.spin_speed = -0.013;
+uranus.orbit = uranus_orbit;
+
+uranus_rings = rings();
+uranus_rings.inner_radius = 32;
+uranus_rings.outer_radius = 44;
+uranus_rings.tilt = [1.15, 0.25, -0.15];
+uranus_rings.color = [150, 210, 228];
+uranus_rings.particle_count = 160;
+uranus.rings = uranus_rings;
+
+% configure neptune ice giant
+neptune_orbit = orbit();
+neptune_orbit.center = primary_star.position;
+neptune_orbit.radius = 845;
+neptune_orbit.eccentricity = 0.01;
+neptune_orbit.inclination = 0.06;
+neptune_orbit.speed = 0.0031;
+neptune_orbit.color = [72, 108, 196];
+neptune_orbit.show_trail = true;
+
+neptune = planet();
+neptune.mass = 1.024e26;
+neptune.radius = 22;
+neptune.color = [64, 116, 232];
+neptune.secondary_color = [38, 72, 178];
+neptune.particle_count = 250;
+neptune.spin_speed = 0.014;
+neptune.orbit = neptune_orbit;
+
+% configure pluto with high eccentricity and inclination
+pluto_orbit = orbit();
+pluto_orbit.center = primary_star.position;
+pluto_orbit.radius = 955;
+pluto_orbit.eccentricity = 0.25;
+pluto_orbit.inclination = 0.30;
+pluto_orbit.speed = 0.0022;
+pluto_orbit.color = [146, 134, 128];
+pluto_orbit.show_trail = true;
+
+pluto = planet();
+pluto.mass = 1.303e22;
+pluto.radius = 8;
+pluto.color = [210, 192, 176];
+pluto.secondary_color = [152, 134, 122];
+pluto.particle_count = 95;
+pluto.spin_speed = 0.009;
+pluto.orbit = pluto_orbit;
 
 % launch simulation
 simulate(sim.duration);
